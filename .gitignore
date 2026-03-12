@@ -1,0 +1,7 @@
+client_secret.json
+.env
+gcp-env/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store

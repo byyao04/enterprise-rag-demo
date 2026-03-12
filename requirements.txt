@@ -1,0 +1,14 @@
+streamlit
+vertexai
+langchain-google-vertexai
+langchain-community
+langchain-text-splitters
+langchain-core
+chromadb
+pypdf
+google-auth
+google-auth-oauthlib
+google-cloud-secret-manager
+requests
+langgraph
+tavily-python
