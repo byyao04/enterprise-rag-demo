@@ -24,7 +24,7 @@ import requests
 # LangGraph
 from langgraph.graph import StateGraph, END
 
-PROJECT_ID = "project-ba94d545-e496-43b6-b25"
+PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "")
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 vertexai.init(project=PROJECT_ID, location="us-central1")
 
@@ -137,7 +137,7 @@ def load_client_config():
     else:
         with open("/Users/boyuan/gcp-demo/client_secret.json") as f:
             config = json.load(f)
-    return config["web"]
+    return config
 
 
 def generate_pkce():
@@ -188,8 +188,15 @@ def get_user_hash(email):
     return hashlib.md5(email.encode()).hexdigest()[:8]
 
 
+CHROMA_BASE_DIR = os.path.expanduser("~/.rag_demo_chroma")
+
 def rebuild_vectorstore(user_hash, docs_dict, embeddings):
-    chroma_client = chromadb.EphemeralClient()
+    if os.environ.get("CLOUD_RUN"):
+        chroma_client = chromadb.EphemeralClient()
+    else:
+        persist_dir = os.path.join(CHROMA_BASE_DIR, user_hash)
+        os.makedirs(persist_dir, exist_ok=True)
+        chroma_client = chromadb.PersistentClient(path=persist_dir)
     collection_name = f"user_{user_hash}"
     try:
         chroma_client.delete_collection(collection_name)
@@ -207,14 +214,17 @@ def rebuild_vectorstore(user_hash, docs_dict, embeddings):
             all_metadatas.append({"source": doc_name, **item["metadata"]})
     if all_texts:
         vectorstore.add_texts(all_texts, metadatas=all_metadatas)
-    st.session_state[f"chroma_{user_hash}"] = chroma_client
     return vectorstore
 
 
 # ── Load config ──
-client_config = load_client_config()
-CLIENT_ID = client_config["client_id"]
-CLIENT_SECRET = client_config["client_secret"]
+@st.cache_resource
+def get_client_credentials():
+    config = load_client_config()
+    web = config["web"]
+    return web["client_id"], web["client_secret"]
+
+CLIENT_ID, CLIENT_SECRET = get_client_credentials()
 
 # ── Handle OAuth callback ──
 params = st.query_params
@@ -439,3 +449,4 @@ if prompt := st.chat_input("Ask anything — documents or current events..."):
         "content": full_response,
         "route": route_used,
     })
+
